@@ -1,0 +1,264 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum Role {
+  USER
+  ADMIN
+}
+
+enum InterviewType {
+  TECHNICAL
+  BEHAVIORAL
+  SYSTEM_DESIGN
+  CODING
+  MIXED
+}
+
+enum Difficulty {
+  BEGINNER
+  INTERMEDIATE
+  ADVANCED
+  EXPERT
+}
+
+enum QuestionType {
+  MCQ
+  CODING
+  SHORT_ANSWER
+  TRUE_FALSE
+}
+
+model User {
+  id              String    @id @default(cuid())
+  name            String?
+  email           String    @unique
+  emailVerified   DateTime?
+  image           String?
+  password        String?
+  role            Role      @default(USER)
+  onboardingDone  Boolean   @default(false)
+  targetRole      String?
+  experienceLevel Difficulty @default(BEGINNER)
+  bio             String?
+  skills          String[]
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+
+  accounts        Account[]
+  sessions        Session[]
+  interviews      Interview[]
+  quizAttempts    QuizAttempt[]
+  resumes         Resume[]
+  chatSessions    ChatSession[]
+  roadmaps        Roadmap[]
+  achievements    UserAchievement[]
+  codeSubmissions CodeSubmission[]
+
+  @@index([email])
+}
+
+model Account {
+  id                String  @id @default(cuid())
+  userId            String
+  type              String
+  provider          String
+  providerAccountId String
+  refresh_token     String? @db.Text
+  access_token      String? @db.Text
+  expires_at        Int?
+  token_type        String?
+  scope             String?
+  id_token          String? @db.Text
+  session_state     String?
+  user              User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([provider, providerAccountId])
+}
+
+model Session {
+  id           String   @id @default(cuid())
+  sessionToken String   @unique
+  userId       String
+  expires      DateTime
+  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model VerificationToken {
+  identifier String
+  token      String   @unique
+  expires    DateTime
+
+  @@unique([identifier, token])
+}
+
+model Interview {
+  id              String        @id @default(cuid())
+  userId          String
+  title           String
+  type            InterviewType @default(TECHNICAL)
+  difficulty      Difficulty    @default(INTERMEDIATE)
+  targetRole      String
+  technologies    String[]
+  durationMinutes Int           @default(30)
+  status          String        @default("pending")
+  score           Float?
+  transcript      Json?
+  feedback        Json?
+  strengths       String[]
+  improvements    String[]
+  completedAt     DateTime?
+  createdAt       DateTime      @default(now())
+  updatedAt       DateTime      @updatedAt
+  user            User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, createdAt])
+}
+
+model Quiz {
+  id         String        @id @default(cuid())
+  title      String
+  topic      String
+  difficulty Difficulty
+  type       QuestionType  @default(MCQ)
+  timeLimit  Int           @default(600)
+  questions  Question[]
+  attempts   QuizAttempt[]
+  createdAt  DateTime      @default(now())
+
+  @@index([topic, difficulty])
+}
+
+model Question {
+  id            String       @id @default(cuid())
+  quizId        String
+  text          String       @db.Text
+  type          QuestionType @default(MCQ)
+  options       String[]
+  correctAnswer String
+  explanation   String?      @db.Text
+  codeSnippet   String?      @db.Text
+  language      String?
+  points        Int          @default(10)
+  order         Int          @default(0)
+  quiz          Quiz         @relation(fields: [quizId], references: [id], onDelete: Cascade)
+}
+
+model QuizAttempt {
+  id           String   @id @default(cuid())
+  userId       String
+  quizId       String
+  score        Float
+  totalPoints  Int
+  earnedPoints Int
+  timeTaken    Int
+  answers      Json
+  feedback     String?  @db.Text
+  tips         String[]
+  completedAt  DateTime @default(now())
+  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  quiz         Quiz     @relation(fields: [quizId], references: [id], onDelete: Cascade)
+
+  @@index([userId, completedAt])
+}
+
+model Resume {
+  id          String   @id @default(cuid())
+  userId      String
+  title       String
+  content     Json
+  rawText     String?  @db.Text
+  atsScore    Float?
+  suggestions Json?
+  version     Int      @default(1)
+  isActive    Boolean  @default(false)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, createdAt])
+}
+
+model ChatSession {
+  id        String        @id @default(cuid())
+  userId    String
+  title     String        @default("New Conversation")
+  mode      String        @default("career")
+  messages  ChatMessage[]
+  createdAt DateTime      @default(now())
+  updatedAt DateTime      @updatedAt
+  user      User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, updatedAt])
+}
+
+model ChatMessage {
+  id        String      @id @default(cuid())
+  sessionId String
+  role      String
+  content   String      @db.Text
+  model     String?
+  createdAt DateTime    @default(now())
+  session   ChatSession @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+
+  @@index([sessionId, createdAt])
+}
+
+model Roadmap {
+  id         String   @id @default(cuid())
+  userId     String
+  title      String
+  targetRole String
+  timeline   String
+  nodes      Json
+  edges      Json
+  progress   Float    @default(0)
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+  user       User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+}
+
+model Achievement {
+  id          String            @id @default(cuid())
+  key         String            @unique
+  title       String
+  description String
+  icon        String
+  points      Int               @default(50)
+  users       UserAchievement[]
+}
+
+model UserAchievement {
+  id            String      @id @default(cuid())
+  userId        String
+  achievementId String
+  unlockedAt    DateTime    @default(now())
+  user          User        @relation(fields: [userId], references: [id], onDelete: Cascade)
+  achievement   Achievement @relation(fields: [achievementId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, achievementId])
+}
+
+model CodeSubmission {
+  id          String   @id @default(cuid())
+  userId      String
+  language    String
+  code        String   @db.Text
+  problem     String   @db.Text
+  result      String
+  testsPassed Int      @default(0)
+  testsTotal  Int      @default(0)
+  runtime     Int?
+  feedback    String?  @db.Text
+  submittedAt DateTime @default(now())
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, submittedAt])
+}
